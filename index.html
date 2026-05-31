@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculator + HST</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0e11;
+      --surface: #18181d;
+      --surface2: #22222a;
+      --border: #2e2e38;
+      --text: #f0f0f5;
+      --text-dim: #6b6b7e;
+      --accent: #7c6af7;
+      --accent2: #5bd8a6;
+      --danger: #f25c7a;
+      --warn: #f5a623;
+      --sci: #a78bfa;
+      --num: #dcdcf0;
+      --shadow: 0 24px 60px rgba(0,0,0,0.6);
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: var(--bg);
+      font-family: 'DM Mono', monospace;
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: -30%; left: -20%;
+      width: 70%; height: 70%;
+      background: radial-gradient(ellipse, rgba(124,106,247,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -30%; right: -20%;
+      width: 60%; height: 60%;
+      background: radial-gradient(ellipse, rgba(91,216,166,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .calculator {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px;
+      width: 420px;
+      box-shadow: var(--shadow);
+      position: relative;
+      z-index: 1;
+    }
+
+    .calc-header {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ── Hamburger Menu ── */
+    .hamburger-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .hamburger-btn:hover { background: var(--surface2); border-color: #3a3a48; }
+    .hamburger-btn:active { transform: scale(0.92); }
+    .hamburger-btn::after { display: none; }
+    .hamburger-btn span {
+      display: block;
+      width: 14px;
+      height: 1.5px;
+      background: var(--text-dim);
+      border-radius: 2px;
+      transition: background 0.15s;
+    }
+    .hamburger-btn:hover span { background: var(--text); }
+
+    /* ── Dropdown Menu ── */
+    .hamburger-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px;
+      min-width: 140px;
+      z-index: 50;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px) scale(0.96);
+      transform-origin: top right;
+      transition: opacity 0.18s cubic-bezier(0.4,0,0.2,1),
+                  transform 0.18s cubic-bezier(0.4,0,0.2,1);
+    }
+    .hamburger-dropdown.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+    .dropdown-item {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--warn);
+      background: rgba(245,166,35,0.08);
+      border: 1px solid rgba(245,166,35,0.2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      width: 100%;
+      height: auto;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 0.06em;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .dropdown-item:hover { background: rgba(245,166,35,0.18); border-color: rgba(245,166,35,0.4); }
+    .dropdown-item:active { transform: scale(0.97); }
+    .dropdown-item::after { display: none; }
+    .dropdown-item .item-rate {
+      margin-left: auto;
+      font-size: 0.65rem;
+      color: rgba(245,166,35,0.7);
+    }
+
+    /* ── Modal overlay ── */
+    .hst-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0);
+      z-index: 10;
+      backdrop-filter: blur(0px);
+      pointer-events: none;
+      transition: background 0.28s cubic-bezier(0.4,0,0.2,1),
+                  backdrop-filter 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+    .hst-overlay.open {
+      background: rgba(0,0,0,0.52);
+      backdrop-filter: blur(6px);
+      pointer-events: auto;
+    }
+
+    /* ── Modal panel ── */
+    .hst-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -44%) scale(0.88);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px 22px 20px;
+      width: 284px;
+      z-index: 11;
+      box-shadow: 0 40px 100px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.32s cubic-bezier(0.34,1.56,0.64,1),
+                  opacity   0.22s cubic-bezier(0.4,0,0.2,1);
+      will-change: transform, opacity;
+    }
+    .hst-modal.open {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .hst-modal.closing {
+      transform: translate(-50%, -46%) scale(0.93);
+      opacity: 0;
+      transition: transform 0.2s cubic-bezier(0.4,0,1,1),
+                  opacity   0.18s cubic-bezier(0.4,0,1,1);
+    }
+
+    .hst-modal-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+    }
+
+    .hst-presets {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .hst-preset {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      background: var(--surface2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 0;
+      height: auto;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .hst-preset:hover { background: #2a2a35; color: var(--text); border-color: #3a3a48; }
+    .hst-preset.active {
+      background: rgba(245,166,35,0.15);
+      color: var(--warn);
+      border-color: rgba(245,166,35,0.45);
+    }
+    .hst-preset::after { display: none; }
+    .hst-preset:active { transform: scale(0.94); }
+
+    .hst-custom-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+    .hst-custom-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+    }
+    .hst-custom-input {
+      flex: 1;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.9rem;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+      -moz-appearance: textfield;
+    }
+    .hst-custom-input:focus { border-color: var(--accent); }
+    .hst-custom-input::-webkit-outer-spin-button,
+    .hst-custom-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .hst-custom-pct { font-size: 0.8rem; color: var(--text-dim); flex-shrink: 0; }
+
+    .hst-modal-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .hst-cancel, .hst-ok {
+      flex: 1;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      border-radius: 10px;
+      padding: 9px 0;
+      height: auto;
+      cursor: pointer;
+      transition: background 0.12s, transform 0.08s;
+    }
+    .hst-cancel::after, .hst-ok::after { display: none; }
+    .hst-cancel {
+      background: var(--surface2);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .hst-cancel:hover { background: #2a2a35; color: var(--text); }
+    .hst-ok {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      box-shadow: 0 4px 16px rgba(124,106,247,0.35);
+    }
+    .hst-ok:hover { background: #8f7dff; }
+    .hst-cancel:active, .hst-ok:active { transform: scale(0.95); }
+
+    .display-wrap {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 22px;
+      min-height: 90px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .display-expr {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      min-height: 1.2em;
+      text-align: right;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+
+    /* Probable (live preview) output shown faded above the input */
+    .display-probable {
+      font-size: 0.78rem;
+      color: var(--accent2);
+      opacity: 0;
+      text-align: right;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-height: 1.1em;
+      transition: opacity 0.18s ease;
+      letter-spacing: -0.01em;
+      pointer-events: none;
+    }
+    .display-probable.visible {
+      opacity: 0.42;
+    }
+
+    .display-main {
+      font-family: 'DM Mono', monospace;
+      font-size: 2.2rem;
+      font-weight: 300;
+      color: var(--text);
+      background: transparent;
+      border: none;
+      outline: none;
+      width: 100%;
+      text-align: right;
+      white-space: nowrap;
+      letter-spacing: -0.02em;
+      caret-color: var(--accent);
+      padding: 0;
+      overflow: hidden;
+      direction: ltr;
+      cursor: text;
+    }
+
+    .display-main::selection { background: rgba(124,106,247,0.3); }
+    .display-main.result-flash { color: var(--accent2); }
+
+    /*
+      5-column grid
+      Row 1: C  ()  +HST  ⌫   ÷
+      Row 2: 7   8    9  1/x  ×
+      Row 3: 4   5    6   √   −
+      Row 4: 1   2    3  +/−  +
+      Row 5: 0   .    %  [= spans cols 4-5]
+    */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+
+    button {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.05rem;
+      font-weight: 400;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0;
+      height: 64px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.12s, transform 0.08s, border-color 0.12s, box-shadow 0.12s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    button:active { transform: scale(0.93); }
+
+    /* Ripple */
+    button::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      width: 100px; height: 100px;
+      background: rgba(255,255,255,0.07);
+      transform: scale(0);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.3s, opacity 0.3s;
+    }
+    button.ripple::after { transform: scale(1); opacity: 1; transition: 0s; }
+
+    /* Number buttons */
+    .btn-num { background: var(--surface2); color: var(--num); }
+    .btn-num:hover { background: #2a2a35; border-color: #3a3a48; }
+
+    /* Operator buttons */
+    .btn-op {
+      background: rgba(124,106,247,0.12);
+      color: var(--accent);
+      border-color: rgba(124,106,247,0.25);
+    }
+    .btn-op:hover { background: rgba(124,106,247,0.22); border-color: rgba(124,106,247,0.4); }
+
+    /* Equals — spans 2 columns */
+    .btn-eq {
+      grid-column: span 2;
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+      font-size: 1.3rem;
+      box-shadow: 0 4px 20px rgba(124,106,247,0.35);
+    }
+    .btn-eq:hover { background: #8f7dff; box-shadow: 0 4px 28px rgba(124,106,247,0.5); }
+
+    /* Clear */
+    .btn-clear {
+      background: rgba(242,92,122,0.12);
+      color: var(--danger);
+      border-color: rgba(242,92,122,0.25);
+    }
+    .btn-clear:hover { background: rgba(242,92,122,0.22); border-color: rgba(242,92,122,0.4); }
+
+    /* HST */
+    .btn-hst {
+      background: rgba(245,166,35,0.12);
+      color: var(--warn);
+      border-color: rgba(245,166,35,0.3);
+      font-family: 'Syne', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .btn-hst:hover { background: rgba(245,166,35,0.22); border-color: rgba(245,166,35,0.5); }
+
+    /* Backspace */
+    .btn-back { background: var(--surface2); color: var(--text-dim); border-color: var(--border); }
+    .btn-back:hover { color: var(--text); border-color: #3a3a48; }
+    .btn-back svg { width: 20px; height: 20px; fill: currentColor; }
+
+    /* Parens */
+    .btn-paren { background: var(--surface2); color: var(--text-dim); }
+    .btn-paren:hover { color: var(--text); background: #2a2a35; }
+
+    /* Scientific column */
+    .btn-sci {
+      background: rgba(167,139,250,0.08);
+      color: var(--sci);
+      border-color: rgba(167,139,250,0.2);
+      font-size: 0.86rem;
+      letter-spacing: -0.01em;
+    }
+    .btn-sci:hover { background: rgba(167,139,250,0.18); border-color: rgba(167,139,250,0.38); }
+
+    .error-shake { animation: shake 0.3s ease; }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-6px); }
+      40%     { transform: translateX(6px); }
+      60%     { transform: translateX(-4px); }
+      80%     { transform: translateX(4px); }
+    }
+
+    .kbd-hint {
+      text-align: center;
+      font-size: 0.56rem;
+      color: var(--text-dim);
+      margin-top: 18px;
+      letter-spacing: 0.08em;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+<div class="calculator">
+  <div class="calc-header">
+    <span>CALC</span>
+    <div style="position:relative;">
+      <button class="hamburger-btn" id="hamburger-btn" onclick="toggleHamburger()" title="Menu" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="hamburger-dropdown" id="hamburger-dropdown">
+        <button class="dropdown-item" onclick="openHSTFromMenu()">
+          HST <span class="item-rate" id="hst-badge-rate">13%</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HST Picker Modal -->
+  <div class="hst-overlay" id="hst-overlay" onclick="closeHSTMenu()"></div>
+  <div class="hst-modal" id="hst-modal">
+    <div class="hst-modal-title">Set HST Rate</div>
+    <div class="hst-presets">
+      <button class="hst-preset" id="preset-10" onclick="selectHSTPreset(10, this)">10%</button>
+      <button class="hst-preset active" id="preset-13" onclick="selectHSTPreset(13, this)">13%</button>
+      <button class="hst-preset" id="preset-15" onclick="selectHSTPreset(15, this)">15%</button>
+      <button class="hst-preset" id="preset-18" onclick="selectHSTPreset(18, this)">18%</button>
+    </div>
+    <div class="hst-custom-row">
+      <span class="hst-custom-label">Custom</span>
+      <input class="hst-custom-input" id="hst-custom" type="number" min="0" max="100" step="0.1" placeholder="e.g. 12.5" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmHST();}" />
+      <span class="hst-custom-pct">%</span>
+    </div>
+    <div class="hst-modal-actions">
+      <button class="hst-cancel" onclick="closeHSTMenu()">Cancel</button>
+      <button class="hst-ok" onclick="confirmHST()">OK</button>
+    </div>
+  </div>
+
+  <div class="display-wrap" id="display-wrap">
+    <div class="display-probable" id="probable"></div>
+    <div class="display-expr" id="expr"></div>
+    <input type="text" class="display-main" id="main" value="" placeholder="0"
+           autocomplete="off" spellcheck="false" />
+  </div>
+
+  <!--
+    5-column grid exact layout:
+    ┌──────┬──────┬───────┬──────┬──────┐
+    │  C   │  ()  │ +HST  │  ⌫   │  ÷   │
+    ├──────┼──────┼───────┼──────┼──────┤
+    │  7   │  8   │   9   │ 1/x  │  ×   │
+    ├──────┼──────┼───────┼──────┼──────┤
+    │  4   │  5   │   6   │  √   │  −   │
+    ├──────┼──────┼───────┼──────┼──────┤
+    │  1   │  2   │   3   │ +/−  │  +   │
+    ├──────┼──────┼───────┼──────┴──────┤
+    │  0   │  .   │   %   │      =      │
+    └──────┴──────┴───────┴─────────────┘
+  -->
+  <div class="grid">
+
+    <!-- Row 1 -->
+    <button class="btn-clear" onclick="clearAll()">C</button>
+    <button class="btn-paren" onclick="insertParen()">(  )</button>
+    <button class="btn-hst"   onclick="applyHST()">+HST</button>
+    <button class="btn-back"  onclick="backspace()">
+      <svg viewBox="0 0 24 24"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L.5 12l4.91 8.12c.36.53.9.88 1.59.88h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3.7 13.3a.996.996 0 01-1.41 0L14 13.41l-2.89 2.89a.996.996 0 11-1.41-1.41L12.59 12 9.7 9.11a.996.996 0 111.41-1.41L14 10.59l2.89-2.89a.996.996 0 111.41 1.41L15.41 12l2.89 2.89c.38.38.38 1.02 0 1.41z"/></svg>
+    </button>
+    <button class="btn-op" onclick="append('/')">÷</button>
+
+    <!-- Row 2 -->
+    <button class="btn-num" onclick="append('7')">7</button>
+    <button class="btn-num" onclick="append('8')">8</button>
+    <button class="btn-num" onclick="append('9')">9</button>
+    <button class="btn-sci" onclick="applyReciprocal()">1/x</button>
+    <button class="btn-op"  onclick="append('*')">×</button>
+
+    <!-- Row 3 -->
+    <button class="btn-num" onclick="append('4')">4</button>
+    <button class="btn-num" onclick="append('5')">5</button>
+    <button class="btn-num" onclick="append('6')">6</button>
+    <button class="btn-sci" onclick="applySqrt()">√</button>
+    <button class="btn-op"  onclick="append('-')">−</button>
+
+    <!-- Row 4 -->
+    <button class="btn-num" onclick="append('1')">1</button>
+    <button class="btn-num" onclick="append('2')">2</button>
+    <button class="btn-num" onclick="append('3')">3</button>
+    <button class="btn-sci" onclick="applyToggleSign()">+/−</button>
+    <button class="btn-op"  onclick="append('+')">+</button>
+
+    <!-- Row 5: 0  .  %  [= spans cols 4-5] -->
+    <button class="btn-num" onclick="append('0')">0</button>
+    <button class="btn-num" onclick="append('.')">.</button>
+    <button class="btn-sci" onclick="applyPercent()">%</button>
+    <button class="btn-eq"  onclick="calculate()">=</button>
+    <!-- btn-eq has grid-column: span 2, so it fills cols 4+5 automatically -->
+
+  </div>
+
+  <div class="kbd-hint">keyboard supported · H = HST · C = clear · % · Q = √ · R = 1/x · ☰ = menu</div>
+</div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────────────────────────
+  let expression = '';
+  let justCalculated = false;
+  let hstRate = 13; // default HST %
+
+  const mainEl     = document.getElementById('main');
+  const exprEl     = document.getElementById('expr');
+  const wrapEl     = document.getElementById('display-wrap');
+  const probableEl = document.getElementById('probable');
+
+  let hamburgerOpen = false;
+
+  // ─── Cursor helpers ───────────────────────────────────────────────────────────
+  function setCursor(pos) {
+    requestAnimationFrame(() => {
+      mainEl.setSelectionRange(pos, pos);
+      mainEl.scrollLeft = mainEl.scrollWidth;
+    });
+  }
+
+  // ─── Display ─────────────────────────────────────────────────────────────────
+  // Raw expression uses: sqrt( for square root, 1/( for reciprocal
+  // Display maps these to nicer symbols
+  function toDisplay(raw) {
+    // Only prettify: sqrt( → √(  and  * → ×
+    // Leave "/" as "/" so (1/3) stays readable and cursor mapping stays 1:1
+    return raw
+      .replace(/sqrt\(/g, '√(')
+      .replace(/\*/g, '×');
+  }
+
+  // Map a cursor position in raw expression → display string position
+  // "sqrt(" (5 chars) → "√(" (2 chars), so we need to track offset shift
+  function rawCursorToDisplay(raw, rawPos) {
+    let disp = 0;
+    let i = 0;
+    while (i < rawPos) {
+      if (raw.slice(i, i + 5) === 'sqrt(') {
+        disp += 2; // "√(" is 2 chars
+        i    += 5;
+      } else {
+        disp += 1;
+        i    += 1;
+      }
+    }
+    return disp;
+  }
+
+  function render(rawCursorPos) {
+    if (expression === '') {
+      mainEl.value = '';
+      exprEl.textContent = '';
+    } else {
+      mainEl.value = toDisplay(expression);
+      exprEl.textContent = '';
+    }
+    mainEl.classList.remove('result-flash');
+    const dispPos = rawCursorPos !== undefined
+      ? rawCursorToDisplay(expression, rawCursorPos)
+      : mainEl.value.length;
+    setCursor(dispPos);
+    updateProbable();
+  }
+
+  // Map display cursor position back to raw expression position
+  function displayCursorToRaw(raw, dispPos) {
+    let d = 0;
+    let i = 0;
+    while (i < raw.length && d < dispPos) {
+      if (raw.slice(i, i + 5) === 'sqrt(') {
+        d += 2;
+        i += 5;
+      } else {
+        d += 1;
+        i += 1;
+      }
+    }
+    return i;
+  }
+
+  function getCursorRaw() {
+    // mainEl.selectionStart is a display-string position; convert to raw
+    return displayCursorToRaw(expression, mainEl.selectionStart);
+  }
+
+  function showResult(value) {
+    const formatted = formatNum(value);
+    exprEl.textContent = toDisplay(expression) + ' =';
+    mainEl.value = formatted;
+    mainEl.classList.add('result-flash');
+    expression = formatted;
+    justCalculated = true;
+    setCursor(formatted.length);
+    hideProbable();
+  }
+
+  function shakeDisplay() {
+    wrapEl.classList.remove('error-shake');
+    void wrapEl.offsetWidth;
+    wrapEl.classList.add('error-shake');
+  }
+
+  // Always round final results to 2 decimal places
+  function formatNum(n) {
+    return parseFloat(n.toFixed(2)).toString();
+  }
+
+  // ─── Helper: trailing number at raw cursor ────────────────────────────────────
+  function getTrailingNumber() {
+    const cursor = getCursorRaw();
+    const before = expression.slice(0, cursor);
+    const after  = expression.slice(cursor);
+    const m = before.match(/(.*?)([-]?\d+\.?\d*)$/);
+    if (!m) return null;
+    return { prePart: m[1], num: parseFloat(m[2]), after };
+  }
+
+  // ─── Core logic ──────────────────────────────────────────────────────────────
+  function append(val) {
+    const ops = ['+', '-', '*', '/'];
+    let cursor = getCursorRaw();
+
+    if (justCalculated) {
+      if (ops.includes(val)) {
+        justCalculated = false;
+        exprEl.textContent = '';
+      } else {
+        expression = '';
+        justCalculated = false;
+        exprEl.textContent = '';
+        cursor = 0;
+      }
+    }
+
+    const before   = expression.slice(0, cursor);
+    const after    = expression.slice(cursor);
+    const lastChar = before.slice(-1);
+
+    if (ops.includes(val) && ops.includes(lastChar)) {
+      expression = before.slice(0, -1) + val + after;
+      render(cursor);
+      return;
+    }
+
+    if (before === '' && after === '' && ops.includes(val) && val !== '-') return;
+
+    if (val === '.') {
+      const segment = before.split(/[\+\-\*\/\(]/).pop();
+      if (segment.includes('.')) return;
+    }
+
+    expression = before + val + after;
+    render(cursor + val.length);
+  }
+
+  function insertParen() {
+    if (justCalculated) { expression = ''; justCalculated = false; exprEl.textContent = ''; }
+    const cursor   = getCursorRaw();
+    const before   = expression.slice(0, cursor);
+    const after    = expression.slice(cursor);
+    const opens    = (expression.match(/\(/g) || []).length;
+    const closes   = (expression.match(/\)/g) || []).length;
+    const lastChar = before.slice(-1);
+    const insert   = (opens === closes || /[\+\-\*\/\(]/.test(lastChar) || expression === '') ? '(' : ')';
+    expression = before + insert + after;
+    render(cursor + 1);
+  }
+
+  function clearAll() {
+    expression = '';
+    justCalculated = false;
+    exprEl.textContent = '';
+    hideProbable();
+    render(0);
+  }
+
+  function backspace() {
+    if (justCalculated) { clearAll(); return; }
+    const cursor = getCursorRaw();
+    if (cursor === 0) return;
+    // Delete "*sqrt(" or "sqrt(" as a single unit
+    if (cursor >= 6 && expression.slice(cursor - 6, cursor) === '*sqrt(') {
+      expression = expression.slice(0, cursor - 6) + expression.slice(cursor);
+      render(cursor - 6);
+    } else if (cursor >= 5 && expression.slice(cursor - 5, cursor) === 'sqrt(') {
+      expression = expression.slice(0, cursor - 5) + expression.slice(cursor);
+      render(cursor - 5);
+    } else {
+      expression = expression.slice(0, cursor - 1) + expression.slice(cursor);
+      render(cursor - 1);
+    }
+  }
+
+  // Pre-process raw expression: replace sqrt(...) with Math.sqrt(...)
+  function prepareForEval(raw) {
+    // Replace sqrt( with Math.sqrt( — handles nested calls too
+    return raw.replace(/sqrt\(/g, 'Math.sqrt(');
+  }
+
+  function calculate() {
+    if (!expression) return;
+    try {
+      // Validate raw expression only contains safe chars + sqrt token
+      const stripped = expression.replace(/sqrt/g, '');
+      if (/[^0-9\+\-\*\/\.\(\)\s]/.test(stripped)) throw new Error('Invalid');
+      const prepared = prepareForEval(expression);
+      const result = Function('"use strict"; return (' + prepared + ')')();
+      if (!isFinite(result) || isNaN(result)) throw new Error('Bad result');
+      showResult(result);
+    } catch {
+      shakeDisplay();
+    }
+  }
+
+  // ─── Probable (live preview) output ──────────────────────────────────────────
+  function hideProbable() {
+    probableEl.classList.remove('visible');
+    probableEl.textContent = '';
+  }
+
+  function updateProbable() {
+    if (justCalculated || !expression) { hideProbable(); return; }
+
+    // Ends with an operator or open paren → user is continuing input
+    if (/[\+\-\*\/\(]$/.test(expression)) { hideProbable(); return; }
+
+    // Must have at least one operator or it's just a bare number (no point showing = same number)
+    if (!/[\+\-\*\/]/.test(expression)) { hideProbable(); return; }
+
+    try {
+      const stripped = expression.replace(/sqrt/g, '');
+      if (/[^0-9\+\-\*\/\.\(\)\s]/.test(stripped)) { hideProbable(); return; }
+      const prepared = prepareForEval(expression);
+      const result = Function('"use strict"; return (' + prepared + ')')();
+      if (!isFinite(result) || isNaN(result)) { hideProbable(); return; }
+      probableEl.textContent = '= ' + formatNum(result);
+      probableEl.classList.add('visible');
+    } catch {
+      hideProbable();
+    }
+  }
+
+  // ─── Hamburger Menu ───────────────────────────────────────────────────────────
+  function toggleHamburger() {
+    hamburgerOpen = !hamburgerOpen;
+    document.getElementById('hamburger-dropdown').classList.toggle('open', hamburgerOpen);
+  }
+
+  function closeHamburger() {
+    hamburgerOpen = false;
+    document.getElementById('hamburger-dropdown').classList.remove('open');
+  }
+
+  function openHSTFromMenu() {
+    closeHamburger();
+    openHSTMenu();
+  }
+
+  // Close hamburger when clicking outside
+  document.addEventListener('click', e => {
+    if (hamburgerOpen &&
+        !e.target.closest('#hamburger-btn') &&
+        !e.target.closest('#hamburger-dropdown')) {
+      closeHamburger();
+    }
+  });
+
+  // ─── HST ─────────────────────────────────────────────────────────────────────
+  function applyHST() {
+    if (!expression) return;
+    const multiplier = 1 + hstRate / 100;
+    if (justCalculated) {
+      const n = parseFloat(expression);
+      if (isNaN(n)) { shakeDisplay(); return; }
+      exprEl.textContent = expression + ' + HST ' + hstRate + '% =';
+      showResult(n * multiplier);
+      return;
+    }
+    const cursor  = getCursorRaw();
+    const before  = expression.slice(0, cursor);
+    const after   = expression.slice(cursor);
+    const m       = before.match(/(.*?)([-]?\d+\.?\d*)$/);
+    if (!m) { shakeDisplay(); return; }
+    const prePart = m[1], num = parseFloat(m[2]);
+    if (isNaN(num)) { shakeDisplay(); return; }
+    const withHST = formatNum(num * multiplier);
+    expression    = prePart + withHST + after;
+    render(prePart.length + withHST.length);
+  }
+
+  // ─── HST Modal ───────────────────────────────────────────────────────────────
+  let pendingHST = null; // the rate being chosen in modal
+
+  let _hstCloseTimer = null;
+
+  function openHSTMenu() {
+    // Cancel any in-progress close
+    if (_hstCloseTimer) { clearTimeout(_hstCloseTimer); _hstCloseTimer = null; }
+
+    pendingHST = hstRate;
+    document.querySelectorAll('.hst-preset').forEach(b => b.classList.remove('active'));
+    const presetMap = { 10:'preset-10', 13:'preset-13', 15:'preset-15', 18:'preset-18' };
+    if (presetMap[hstRate]) {
+      const el = document.getElementById(presetMap[hstRate]);
+      if (el) el.classList.add('active');
+    }
+    document.getElementById('hst-custom').value = '';
+
+    const overlay = document.getElementById('hst-overlay');
+    const modal   = document.getElementById('hst-modal');
+
+    modal.classList.remove('closing');
+    overlay.classList.add('open');
+
+    // Tiny rAF delay so browser paints the initial state before transitioning
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        modal.classList.add('open');
+      });
+    });
+  }
+
+  function closeHSTMenu() {
+    const overlay = document.getElementById('hst-overlay');
+    const modal   = document.getElementById('hst-modal');
+
+    modal.classList.remove('open');
+    modal.classList.add('closing');
+    overlay.classList.remove('open');
+
+    // Remove closing class after animation finishes so it's reset for next open
+    _hstCloseTimer = setTimeout(() => {
+      modal.classList.remove('closing');
+      _hstCloseTimer = null;
+    }, 220);
+  }
+
+  function selectHSTPreset(rate, el) {
+    pendingHST = rate;
+    document.querySelectorAll('.hst-preset').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('hst-custom').value = '';
+  }
+
+  function confirmHST() {
+    const customInput = document.getElementById('hst-custom').value.trim();
+    let rate = pendingHST;
+    if (customInput !== '') {
+      const parsed = parseFloat(customInput);
+      if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+        document.getElementById('hst-custom').focus();
+        document.getElementById('hst-custom').style.borderColor = 'var(--danger)';
+        setTimeout(() => document.getElementById('hst-custom').style.borderColor = '', 1200);
+        return;
+      }
+      rate = parsed;
+    }
+    hstRate = rate;
+    // Update badge label
+    const display = Number.isInteger(rate) ? rate + '%' : parseFloat(rate.toFixed(2)) + '%';
+    document.getElementById('hst-badge-rate').textContent = display;
+    closeHSTMenu();
+  }
+
+  // ─── Scientific functions ─────────────────────────────────────────────────────
+  function applyPercent() {
+    if (!expression) return;
+    if (justCalculated) {
+      const n = parseFloat(expression);
+      if (isNaN(n)) { shakeDisplay(); return; }
+      exprEl.textContent = expression + '% =';
+      showResult(n / 100);
+      return;
+    }
+    const t = getTrailingNumber();
+    if (!t) { shakeDisplay(); return; }
+    const result = formatNum(t.num / 100);
+    expression = t.prePart + result + t.after;
+    render(t.prePart.length + result.length);
+  }
+
+  // √ — inserts "sqrt()" at cursor.
+  // If cursor is right after a digit or closing paren → auto-inserts "*" first → e.g. 9*sqrt()
+  // Cursor lands inside the brackets. User types content then closes ) manually.
+  function applySqrt() {
+    if (justCalculated) { expression = ''; justCalculated = false; exprEl.textContent = ''; }
+    const cursor   = getCursorRaw();
+    const before   = expression.slice(0, cursor);
+    const after    = expression.slice(cursor);
+    const lastChar = before.slice(-1);
+
+    // Auto-multiply if previous token is a digit or closing paren
+    const needsMul = /[0-9\)]/.test(lastChar);
+    const token    = (needsMul ? '*' : '') + 'sqrt(';
+
+    expression = before + token + after;
+    // Cursor sits right after '(' — inside the open bracket
+    render(cursor + token.length);
+  }
+
+  function applyToggleSign() {
+    if (!expression) return;
+    if (justCalculated) {
+      const n = parseFloat(expression);
+      if (isNaN(n)) { shakeDisplay(); return; }
+      const toggled = formatNum(n * -1);
+      expression = toggled;
+      mainEl.value = toDisplay(toggled);
+      mainEl.classList.add('result-flash');
+      setCursor(toggled.length);
+      return;
+    }
+    const t = getTrailingNumber();
+    if (!t) { shakeDisplay(); return; }
+    const newNum = t.num < 0
+      ? formatNum(Math.abs(t.num))
+      : '(-' + formatNum(t.num) + ')';
+    expression = t.prePart + newNum + t.after;
+    render(t.prePart.length + newNum.length);
+  }
+
+  // 1/x — inserts "(1/x)" style: prefix*(1/) with cursor after the slash.
+  // If cursor is right after a digit or closing paren → auto-inserts "*" first → e.g. 9*(1/)
+  // User types denominator then closes ) manually.
+  function applyReciprocal() {
+    if (justCalculated) { expression = ''; justCalculated = false; exprEl.textContent = ''; }
+    const cursor   = getCursorRaw();
+    const before   = expression.slice(0, cursor);
+    const after    = expression.slice(cursor);
+    const lastChar = before.slice(-1);
+
+    // Auto-multiply if previous token is a digit or closing paren
+    const needsMul = /[0-9\)]/.test(lastChar);
+    const prefix   = needsMul ? '*' : '';
+    // Inserts "(1/" — cursor sits right after '/' inside the paren
+    // User types denominator then closes ) manually
+    const token    = prefix + '(1/';
+
+    expression = before + token + after;
+    render(cursor + token.length);
+  }
+
+  // ─── Keyboard ────────────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') return;
+    // Don't intercept keys when HST custom input is focused
+    if (document.activeElement === document.getElementById('hst-custom')) return;
+
+    if      (/^[0-9]$/.test(e.key))                 { e.preventDefault(); append(e.key); }
+    else if (['+','-','*','/'].includes(e.key))      { e.preventDefault(); append(e.key); }
+    else if (e.key === '.')                           { e.preventDefault(); append('.'); }
+    else if (e.key === '(' || e.key === ')')          { e.preventDefault(); insertParen(); }
+    else if (e.key === 'Enter' || e.key === '=')      { e.preventDefault(); calculate(); }
+    else if (e.key === 'Backspace')                   { e.preventDefault(); backspace(); }
+    else if (e.key.toLowerCase() === 'c')             { e.preventDefault(); clearAll(); }
+    else if (e.key.toLowerCase() === 'h')             { e.preventDefault(); applyHST(); }
+    else if (e.key === 'Escape') { e.preventDefault(); if (document.getElementById('hst-modal').classList.contains('open')) { closeHSTMenu(); } else { clearAll(); } }
+    else if (e.key === '%')                           { e.preventDefault(); applyPercent(); }
+    else if (e.key.toLowerCase() === 'q')             { e.preventDefault(); applySqrt(); }
+    else if (e.key.toLowerCase() === 'r')             { e.preventDefault(); applyReciprocal(); }
+    else if (e.key === 'Delete') {
+      e.preventDefault();
+      const cursor = getCursorRaw();
+      if (cursor < expression.length) {
+        // If next 5 chars are "sqrt(", delete all at once
+        if (expression.slice(cursor, cursor + 5) === 'sqrt(') {
+          expression = expression.slice(0, cursor) + expression.slice(cursor + 5);
+        } else {
+          expression = expression.slice(0, cursor) + expression.slice(cursor + 1);
+        }
+        render(cursor);
+      }
+    }
+  });
+
+  // Paste sanitization — only numbers and arithmetic chars allowed
+  mainEl.addEventListener('paste', e => {
+    e.preventDefault();
+    const raw  = (e.clipboardData || window.clipboardData).getData('text');
+    const safe = raw.replace(/[^0-9\+\-\*\/\.\(\)]/g, '');
+    if (!safe) return;
+    const cursor = getCursorRaw();
+    expression = expression.slice(0, cursor) + safe + expression.slice(cursor);
+    render(cursor + safe.length);
+  });
+
+  // Ripple
+  document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('pointerdown', () => {
+      btn.classList.remove('ripple');
+      void btn.offsetWidth;
+      btn.classList.add('ripple');
+      setTimeout(() => btn.classList.remove('ripple'), 400);
+    });
+  });
+</script>
+</body>
+</html>
